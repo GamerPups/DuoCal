@@ -28,8 +28,14 @@ function buildAuthOptions(): NextAuthOptions {
           token.accessToken = account.access_token;
           token.refreshToken = account.refresh_token;
         }
-        if (user) {
+        if (user?.id) {
           token.id = user.id;
+        } else if (!token.id && token.email) {
+          const dbUser = await prisma.user.findUnique({
+            where: { email: token.email },
+            select: { id: true },
+          });
+          if (dbUser) token.id = dbUser.id;
         }
         return token;
       },

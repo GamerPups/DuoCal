@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import { Menu, Bot } from "lucide-react";
 import { Sidebar } from "./Sidebar";
@@ -13,9 +14,23 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
+  const { status } = useSession({
+    required: true,
+    onUnauthenticated() {
+      window.location.href = "/login";
+    },
+  });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const { workspaceId } = useWorkspace();
+
+  if (status === "loading") {
+    return (
+      <div className="flex h-screen items-center justify-center bg-duocal-void">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-duocal-accent border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-duocal-void">

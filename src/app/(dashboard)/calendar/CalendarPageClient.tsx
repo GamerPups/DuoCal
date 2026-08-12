@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { CalendarGrid } from "@/components/calendar/CalendarGrid";
 import { OnboardingModal } from "@/components/auth/OnboardingModal";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import type { CalendarEventDTO } from "@/types";
+import { fetchJsonArray, fetchJsonObject } from "@/lib/api-client";
+import type { CalendarEventDTO, UserPreferencesDTO } from "@/types";
 
 export function CalendarPageClient() {
+  const { status } = useSession();
   const searchParams = useSearchParams();
   const { workspaceId, setWorkspaceId } = useWorkspace();
   const [events, setEvents] = useState<CalendarEventDTO[]>([]);
@@ -19,10 +22,12 @@ export function CalendarPageClient() {
   }, [searchParams, setWorkspaceId]);
 
   const fetchEvents = useCallback(async () => {
+    if (status !== "authenticated") return;
+
     const params = workspaceId ? `?workspaceId=${workspaceId}` : "";
-    const res = await fetch(`/api/events${params}`);
-    if (res.ok) setEvents(await res.json());
-  }, [workspaceId]);
+    const data = await fetchJsonArray<CalendarEventDTO>(`/api/events${params}`);
+    setEvents(data);
+  }, [workspaceId, status]);
 
   useEffect(() => {
     fetchEvents();
@@ -35,12 +40,20 @@ export function CalendarPageClient() {
   }, [fetchEvents]);
 
   useEffect(() => {
-    fetch("/api/preferences")
-      .then((r) => r.json())
-      .then((prefs) => {
-        if (!prefs.onboardingCompleted) setShowOnboarding(true);
-      });
-  }, []);
+    if (status !== "authenticated") return;
+
+    fetchJsonObject<UserPreferencesDTO>("/api/preferences").then((prefs) => {
+      if (prefs && !prefs.onboardingCompleted) setShowOnboarding(true);
+    });
+  }, [status]);
+
+  if (status === "loading") {
+    return (
+      <div className="flex h-64 items-center justify-center rounded-xl border border-duocal-border bg-duocal-slate">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-duocal-accent border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <>

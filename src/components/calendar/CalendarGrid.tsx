@@ -1,19 +1,25 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
-import type { DateSelectArg, EventClickArg } from "@fullcalendar/core";
+import { useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
-import { Download, MapPin, Plus } from "lucide-react";
+import { Download, Plus } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { MapsPreviewModal } from "./MapsPreviewModal";
 import { EventDialog } from "./EventDialog";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import type { CalendarEventDTO } from "@/types";
+
+const CalendarView = dynamic(() => import("./CalendarView"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-64 items-center justify-center rounded-lg border border-duocal-border bg-duocal-void">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-duocal-accent border-t-transparent" />
+    </div>
+  ),
+});
 
 interface CalendarGridProps {
   events: CalendarEventDTO[];
@@ -22,7 +28,6 @@ interface CalendarGridProps {
 }
 
 export function CalendarGrid({ events, onEventsChange, workspaceId }: CalendarGridProps) {
-  const calendarRef = useRef<FullCalendar>(null);
   const { toast } = useToast();
   const [syncing, setSyncing] = useState(false);
   const [mapLocation, setMapLocation] = useState<string | null>(null);
@@ -52,26 +57,29 @@ export function CalendarGrid({ events, onEventsChange, workspaceId }: CalendarGr
     setDialogOpen(true);
   };
 
-  const openEdit = (event: CalendarEventDTO) => {
+  const openEdit = useCallback((event: CalendarEventDTO) => {
     setSelectedEvent(event);
     setDefaultStart(undefined);
     setDefaultEnd(undefined);
     setDialogOpen(true);
-  };
-
-  const handleDateSelect = (info: DateSelectArg) => {
-    openCreate(info.start, info.end);
-    calendarRef.current?.getApi().unselect();
-  };
-
-  const handleEventClick = (info: EventClickArg) => {
-    const raw = info.event.extendedProps.raw as CalendarEventDTO;
-    if (raw) openEdit(raw);
-  };
+  }, []);
 
   const handleGoogleSync = async () => {
     setSyncing(true);
     try {
+      const statusRes = await fetch("/api/google/calendar-status");
+      const status = await statusRes.json();
+
+      if (!statusRes.ok) {
+        toast("Sign in again to import events", "error");
+        return;
+      }
+
+      if (!status.connected) {
+        toast("Connect Google Calendar in Settings before importing", "error");
+        return;
+      }
+
       const res = await fetch("/api/sync/google", { method: "POST" });
       const data = await res.json();
       if (res.ok) {
@@ -86,27 +94,6 @@ export function CalendarGrid({ events, onEventsChange, workspaceId }: CalendarGr
       setSyncing(false);
     }
   };
-
-  const renderEventContent = useCallback(
-    (eventInfo: { event: { title: string; extendedProps: { location?: string } } }) => {
-      const location = eventInfo.event.extendedProps.location;
-      return (
-        <div className="flex items-center gap-1 overflow-hidden px-1 py-0.5 text-xs">
-          <span className="truncate font-medium">{eventInfo.event.title}</span>
-          {location && (
-            <MapPin
-              className="h-3 w-3 shrink-0 cursor-pointer opacity-80 hover:opacity-100"
-              onClick={(e) => {
-                e.stopPropagation();
-                setMapLocation(location);
-              }}
-            />
-          )}
-        </div>
-      );
-    },
-    []
-  );
 
   return (
     <>
@@ -123,40 +110,29 @@ export function CalendarGrid({ events, onEventsChange, workspaceId }: CalendarGr
               New Event
             </Button>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleGoogleSync}
-            disabled={syncing}
-            className="gap-2"
-          >
-            <Download className="h-4 w-4" />
-            {syncing ? "Syncing..." : "Import Google Calendar"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGoogleSync}
+              disabled={syncing}
+              className="gap-2"
+            >
+              <Download className="h-4 w-4" />
+              {syncing ? "Syncing..." : "Import Google Calendar"}
+            </Button>
+            <Button variant="ghost" size="sm" asChild className="text-xs text-slate-500">
+              <Link href="/settings">Connect in Settings</Link>
+            </Button>
+          </div>
         </div>
 
-        <div className="duocal-calendar">
-          <FullCalendar
-            ref={calendarRef}
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="timeGridWeek"
-            headerToolbar={{
-              left: "prev,next today",
-              center: "title",
-              right: "dayGridMonth,timeGridWeek,timeGridDay",
-            }}
-            events={fcEvents}
-            eventContent={renderEventContent}
-            select={handleDateSelect}
-            eventClick={handleEventClick}
-            height="auto"
-            slotMinTime="06:00:00"
-            slotMaxTime="22:00:00"
-            nowIndicator
-            selectable
-            selectMirror
-          />
-        </div>
+        <CalendarView
+          events={fcEvents}
+          onDateSelect={openCreate}
+          onEventClick={openEdit}
+          onLocationClick={setMapLocation}
+        />
       </motion.div>
 
       <EventDialog

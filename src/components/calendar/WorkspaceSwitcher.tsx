@@ -4,27 +4,25 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { ChevronDown, User } from "lucide-react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { fetchJsonArray } from "@/lib/api-client";
 import type { WorkspaceDTO } from "@/types";
 import { cn } from "@/lib/utils";
 
 export function WorkspaceSwitcher() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const { workspaceId, setWorkspaceId } = useWorkspace();
   const [workspaces, setWorkspaces] = useState<WorkspaceDTO[]>([]);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    fetch("/api/calendars")
-      .then((r) => r.json())
-      .then(setWorkspaces)
-      .catch(() => {});
-  }, []);
+    if (status !== "authenticated" || !session?.user?.id) return;
 
-  const active = workspaceId
-    ? workspaces.find((w) => w.id === workspaceId)
-    : null;
+    fetchJsonArray<WorkspaceDTO>("/api/calendars").then(setWorkspaces);
+  }, [status, session?.user?.id]);
 
-  const getMyColor = (ws: (typeof workspaces)[0]) =>
+  const active = workspaceId ? workspaces.find((w) => w.id === workspaceId) : null;
+
+  const getMyColor = (ws: WorkspaceDTO) =>
     ws.members?.find((m) => m.userId === session?.user?.id)?.color ?? "#3B82F6";
 
   return (

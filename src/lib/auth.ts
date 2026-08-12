@@ -23,16 +23,6 @@ function buildAuthOptions(): NextAuthOptions {
       }),
     ],
     callbacks: {
-      async signIn({ user }) {
-        if (user.id) {
-          await prisma.userPreferences.upsert({
-            where: { userId: user.id },
-            create: { userId: user.id },
-            update: {},
-          });
-        }
-        return true;
-      },
       async jwt({ token, account, user }) {
         if (account) {
           token.accessToken = account.access_token;
@@ -49,6 +39,17 @@ function buildAuthOptions(): NextAuthOptions {
         }
         session.accessToken = token.accessToken as string | undefined;
         return session;
+      },
+    },
+    events: {
+      async signIn({ user }) {
+        if (!user.id) return;
+
+        await prisma.userPreferences.upsert({
+          where: { userId: user.id },
+          create: { userId: user.id },
+          update: {},
+        });
       },
     },
     pages: {

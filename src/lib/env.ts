@@ -12,15 +12,12 @@ export function getAuthEnv(strict = false) {
   const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
 
   if (strict) {
-    if (!secret?.trim()) {
-      throw new Error(
-        "Missing NEXTAUTH_SECRET. Generate one with: node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\""
-      );
-    }
-    if (!googleClientId || !googleClientSecret) {
-      throw new Error(
-        "Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET. Add them from Google Cloud Console."
-      );
+    const missing: string[] = [];
+    if (!secret?.trim()) missing.push("NEXTAUTH_SECRET");
+    if (!googleClientId) missing.push("GOOGLE_CLIENT_ID");
+    if (!googleClientSecret) missing.push("GOOGLE_CLIENT_SECRET");
+    if (missing.length > 0) {
+      throw new Error(`Missing environment variables: ${missing.join(", ")}`);
     }
   }
 

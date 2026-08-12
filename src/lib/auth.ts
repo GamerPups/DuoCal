@@ -3,6 +3,7 @@ import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "./prisma";
 import { getAuthEnv } from "./env";
+import { GOOGLE_SIGNIN_SCOPE } from "./google-scopes";
 
 function buildAuthOptions(): NextAuthOptions {
   const { secret, googleClientId, googleClientSecret } = getAuthEnv();
@@ -15,15 +16,8 @@ function buildAuthOptions(): NextAuthOptions {
         clientSecret: googleClientSecret,
         authorization: {
           params: {
-            scope: [
-              "openid",
-              "email",
-              "profile",
-              "https://www.googleapis.com/auth/calendar",
-              "https://www.googleapis.com/auth/calendar.events",
-            ].join(" "),
+            scope: GOOGLE_SIGNIN_SCOPE,
             access_type: "offline",
-            prompt: "consent",
           },
         },
       }),

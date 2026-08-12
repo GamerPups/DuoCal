@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { motion } from "framer-motion";
-import { LogOut } from "lucide-react";
+import { CheckCircle2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ConnectGoogleCalendarButton } from "@/components/auth/ConnectGoogleCalendarButton";
 import type { UserPreferencesDTO } from "@/types";
 
 export default function SettingsPage() {
@@ -17,11 +18,20 @@ export default function SettingsPage() {
     onboardingCompleted: true,
   });
   const [saving, setSaving] = useState(false);
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const [calendarStatusLoading, setCalendarStatusLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/preferences")
       .then((r) => r.json())
       .then(setPrefs);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/google/calendar-status")
+      .then((r) => r.json())
+      .then((data) => setCalendarConnected(Boolean(data.connected)))
+      .finally(() => setCalendarStatusLoading(false));
   }, []);
 
   const toggle = async (key: keyof UserPreferencesDTO) => {
@@ -71,6 +81,33 @@ export default function SettingsPage() {
             <p className="text-sm text-slate-400">{session?.user?.email}</p>
           </div>
         </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="rounded-xl border border-duocal-border bg-duocal-slate p-6 shadow-card"
+      >
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-slate-500">
+          Google Calendar
+        </h2>
+        {calendarStatusLoading ? (
+          <p className="text-sm text-slate-400">Checking connection...</p>
+        ) : calendarConnected ? (
+          <div className="flex items-center gap-2 text-sm text-emerald-400">
+            <CheckCircle2 className="h-4 w-4" />
+            Connected — sync and AI scheduling can use your Google Calendar
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-400">
+              Sign in works without Calendar access. Connect when you want to import events or
+              sync new ones to Google.
+            </p>
+            <ConnectGoogleCalendarButton />
+          </div>
+        )}
       </motion.div>
 
       <motion.div

@@ -90,7 +90,7 @@ function LoginContent() {
           </div>
 
           <p className="mt-6 text-center text-xs text-slate-600">
-            Connects to Google Calendar for sync and scheduling
+            Sign in with Google. Connect Calendar later in Settings for sync.
           </p>
         </div>
       </motion.div>

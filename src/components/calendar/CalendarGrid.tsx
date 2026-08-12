@@ -77,6 +77,8 @@ export function CalendarGrid({ events, onEventsChange, workspaceId }: CalendarGr
       if (res.ok) {
         onEventsChange?.();
         toast(`Imported ${data.imported} of ${data.total} events from Google Calendar`);
+      } else if (res.status === 400 && data.error === "Google Calendar not connected") {
+        toast("Connect Google Calendar in Settings first", "error");
       } else {
         toast(data.error ?? "Sync failed", "error");
       }

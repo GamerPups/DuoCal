@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    getAuthEnv();
+    getAuthEnv(true);
     getDatabaseUrl();
     await prisma.$queryRaw`SELECT 1`;
     return NextResponse.json({ ok: true });

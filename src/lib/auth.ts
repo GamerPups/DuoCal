@@ -10,6 +10,7 @@ function buildAuthOptions(): NextAuthOptions {
 
   return {
     adapter: PrismaAdapter(prisma),
+    trustHost: true,
     providers: [
       GoogleProvider({
         clientId: googleClientId,
@@ -23,20 +24,41 @@ function buildAuthOptions(): NextAuthOptions {
       }),
     ],
     callbacks: {
-      async jwt({ token, account, user }) {
+      async jwt({ token, account, user, profile }) {
         if (account) {
           token.accessToken = account.access_token;
           token.refreshToken = account.refresh_token;
         }
+
         if (user?.id) {
           token.id = user.id;
-        } else if (!token.id && token.email) {
-          const dbUser = await prisma.user.findUnique({
-            where: { email: token.email },
-            select: { id: true },
-          });
-          if (dbUser) token.id = dbUser.id;
         }
+
+        if (!token.id && account?.providerAccountId) {
+          const linked = await prisma.account.findFirst({
+            where: {
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+            },
+            select: { userId: true },
+          });
+          if (linked) token.id = linked.userId;
+        }
+
+        if (!token.id) {
+          const email =
+            (typeof token.email === "string" && token.email) ||
+            (typeof profile?.email === "string" && profile.email) ||
+            null;
+          if (email) {
+            const dbUser = await prisma.user.findUnique({
+              where: { email },
+              select: { id: true },
+            });
+            if (dbUser) token.id = dbUser.id;
+          }
+        }
+
         return token;
       },
       async session({ session, token }) {
@@ -51,11 +73,15 @@ function buildAuthOptions(): NextAuthOptions {
       async signIn({ user }) {
         if (!user.id) return;
 
-        await prisma.userPreferences.upsert({
-          where: { userId: user.id },
-          create: { userId: user.id },
-          update: {},
-        });
+        try {
+          await prisma.userPreferences.upsert({
+            where: { userId: user.id },
+            create: { userId: user.id },
+            update: {},
+          });
+        } catch {
+          // Don't block sign-in if preferences row fails
+        }
       },
     },
     pages: {

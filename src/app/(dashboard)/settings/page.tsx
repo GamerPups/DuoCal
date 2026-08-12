@@ -7,10 +7,15 @@ import { CheckCircle2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConnectGoogleCalendarButton } from "@/components/auth/ConnectGoogleCalendarButton";
+import { GuestBanner } from "@/components/auth/GuestBanner";
+import { SignInButton } from "@/components/auth/SignInButton";
+import { useRequireAuth } from "@/hooks/use-require-auth";
+import { fetchJsonObject } from "@/lib/api-client";
 import type { UserPreferencesDTO } from "@/types";
 
 export default function SettingsPage() {
   const { data: session } = useSession();
+  const { isAuthenticated, requireAuth } = useRequireAuth();
   const [prefs, setPrefs] = useState<UserPreferencesDTO>({
     eventInvites: true,
     securityAlerts: true,
@@ -22,19 +27,28 @@ export default function SettingsPage() {
   const [calendarStatusLoading, setCalendarStatusLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/preferences")
-      .then((r) => r.json())
-      .then(setPrefs);
-  }, []);
+    if (!isAuthenticated) return;
+
+    fetchJsonObject<UserPreferencesDTO>("/api/preferences").then((data) => {
+      if (data) setPrefs(data);
+    });
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    fetch("/api/google/calendar-status")
-      .then((r) => r.json())
-      .then((data) => setCalendarConnected(Boolean(data.connected)))
+    if (!isAuthenticated) {
+      setCalendarConnected(false);
+      setCalendarStatusLoading(false);
+      return;
+    }
+
+    fetchJsonObject<{ connected: boolean }>("/api/google/calendar-status")
+      .then((data) => setCalendarConnected(Boolean(data?.connected)))
       .finally(() => setCalendarStatusLoading(false));
-  }, []);
+  }, [isAuthenticated]);
 
   const toggle = async (key: keyof UserPreferencesDTO) => {
+    if (!requireAuth("/settings")) return;
+
     const updated = { ...prefs, [key]: !prefs[key] };
     setPrefs(updated);
     setSaving(true);
@@ -51,6 +65,30 @@ export default function SettingsPage() {
     { key: "securityAlerts" as const, label: "Security & password resets" },
     { key: "productUpdates" as const, label: "Product updates & DuoCal feature releases" },
   ];
+
+  if (!isAuthenticated) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-6">
+        <GuestBanner />
+        <div>
+          <h1 className="text-2xl font-bold text-white">Settings</h1>
+          <p className="text-sm text-slate-400">
+            Sign in to manage your account, notifications, and Google Calendar sync.
+          </p>
+        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-duocal-border bg-duocal-slate p-8 text-center shadow-card"
+        >
+          <p className="text-slate-400">Account settings are available after sign-in.</p>
+          <div className="mt-6 flex justify-center">
+            <SignInButton callbackUrl="/settings" />
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -102,8 +140,7 @@ export default function SettingsPage() {
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-slate-400">
-              Sign in works without Calendar access. Connect when you want to import events or
-              sync new ones to Google.
+              Connect Google Calendar to import events and sync new ones.
             </p>
             <ConnectGoogleCalendarButton />
           </div>
@@ -134,7 +171,7 @@ export default function SettingsPage() {
 
       <Button
         variant="destructive"
-        onClick={() => signOut({ callbackUrl: "/login" })}
+        onClick={() => signOut({ callbackUrl: "/calendar" })}
         className="gap-2"
       >
         <LogOut className="h-4 w-4" />

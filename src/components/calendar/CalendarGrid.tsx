@@ -7,6 +7,7 @@ import { Download, Plus } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 import { MapsPreviewModal } from "./MapsPreviewModal";
 import { EventDialog } from "./EventDialog";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
@@ -25,10 +26,17 @@ interface CalendarGridProps {
   events: CalendarEventDTO[];
   onEventsChange?: () => void;
   workspaceId?: string | null;
+  isAuthenticated?: boolean;
 }
 
-export function CalendarGrid({ events, onEventsChange, workspaceId }: CalendarGridProps) {
+export function CalendarGrid({
+  events,
+  onEventsChange,
+  workspaceId,
+  isAuthenticated = false,
+}: CalendarGridProps) {
   const { toast } = useToast();
+  const { requireAuth } = useRequireAuth();
   const [syncing, setSyncing] = useState(false);
   const [mapLocation, setMapLocation] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -65,6 +73,8 @@ export function CalendarGrid({ events, onEventsChange, workspaceId }: CalendarGr
   }, []);
 
   const handleGoogleSync = async () => {
+    if (!requireAuth()) return;
+
     setSyncing(true);
     try {
       const statusRes = await fetch("/api/google/calendar-status");
@@ -115,8 +125,9 @@ export function CalendarGrid({ events, onEventsChange, workspaceId }: CalendarGr
               variant="outline"
               size="sm"
               onClick={handleGoogleSync}
-              disabled={syncing}
+              disabled={syncing || !isAuthenticated}
               className="gap-2"
+              title={!isAuthenticated ? "Sign in to import events" : undefined}
             >
               <Download className="h-4 w-4" />
               {syncing ? "Syncing..." : "Import Google Calendar"}

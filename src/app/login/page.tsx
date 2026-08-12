@@ -62,7 +62,7 @@ function LoginContent() {
         <div className="rounded-2xl border border-duocal-border bg-duocal-slate/80 p-8 shadow-card backdrop-blur-xl">
           <h1 className="text-center text-3xl font-bold tracking-tight text-white">DuoCal</h1>
           <p className="mt-2 text-center text-sm text-slate-400">
-            Privacy-first shared calendars with AI scheduling
+            Browse free — sign in when you&apos;re ready to save
           </p>
 
           {errorMessage && (
@@ -102,7 +102,10 @@ function LoginContent() {
           </div>
 
           <p className="mt-6 text-center text-xs text-slate-600">
-            Sign in with Google. Connect Calendar later in Settings for sync.
+            Or continue as guest from the{" "}
+            <a href="/calendar" className="text-duocal-accent hover:underline">
+              calendar
+            </a>
           </p>
         </div>
       </motion.div>

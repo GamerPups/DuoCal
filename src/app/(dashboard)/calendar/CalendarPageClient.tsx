@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { CalendarGrid } from "@/components/calendar/CalendarGrid";
 import { OnboardingModal } from "@/components/auth/OnboardingModal";
+import { GuestBanner } from "@/components/auth/GuestBanner";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api-client";
 import type { CalendarEventDTO, UserPreferencesDTO } from "@/types";
 
 export function CalendarPageClient() {
-  const { status } = useSession();
+  const { isAuthenticated, status } = useRequireAuth();
   const searchParams = useSearchParams();
   const { workspaceId, setWorkspaceId } = useWorkspace();
   const [events, setEvents] = useState<CalendarEventDTO[]>([]);
@@ -22,12 +23,15 @@ export function CalendarPageClient() {
   }, [searchParams, setWorkspaceId]);
 
   const fetchEvents = useCallback(async () => {
-    if (status !== "authenticated") return;
+    if (!isAuthenticated) {
+      setEvents([]);
+      return;
+    }
 
     const params = workspaceId ? `?workspaceId=${workspaceId}` : "";
     const data = await fetchJsonArray<CalendarEventDTO>(`/api/events${params}`);
     setEvents(data);
-  }, [workspaceId, status]);
+  }, [workspaceId, isAuthenticated]);
 
   useEffect(() => {
     fetchEvents();
@@ -40,12 +44,12 @@ export function CalendarPageClient() {
   }, [fetchEvents]);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (!isAuthenticated) return;
 
     fetchJsonObject<UserPreferencesDTO>("/api/preferences").then((prefs) => {
       if (prefs && !prefs.onboardingCompleted) setShowOnboarding(true);
     });
-  }, [status]);
+  }, [isAuthenticated]);
 
   if (status === "loading") {
     return (
@@ -57,10 +61,12 @@ export function CalendarPageClient() {
 
   return (
     <>
+      {!isAuthenticated && <GuestBanner />}
       <CalendarGrid
         events={events}
         onEventsChange={fetchEvents}
         workspaceId={workspaceId}
+        isAuthenticated={isAuthenticated}
       />
       <OnboardingModal
         open={showOnboarding}

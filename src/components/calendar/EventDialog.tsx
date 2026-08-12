@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/toast";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 import type { CalendarEventDTO } from "@/types";
 
 interface EventDialogProps {
@@ -43,6 +44,7 @@ export function EventDialog({
   defaultEnd,
 }: EventDialogProps) {
   const { toast } = useToast();
+  const { requireAuth } = useRequireAuth();
   const isEdit = !!event;
 
   const [title, setTitle] = useState("");
@@ -77,6 +79,8 @@ export function EventDialog({
 
   const handleSave = async () => {
     if (!title.trim() || !start || !end) return;
+    if (!requireAuth()) return;
+
     setLoading(true);
 
     try {
@@ -101,6 +105,10 @@ export function EventDialog({
 
       if (!res.ok) {
         const data = await res.json();
+        if (res.status === 401) {
+          requireAuth();
+          return;
+        }
         toast(data.error ?? "Failed to save event", "error");
         return;
       }
@@ -115,6 +123,8 @@ export function EventDialog({
 
   const handleDelete = async () => {
     if (!event || !confirm("Delete this event?")) return;
+    if (!requireAuth()) return;
+
     setLoading(true);
     try {
       const res = await fetch(`/api/events/${event.id}`, { method: "DELETE" });

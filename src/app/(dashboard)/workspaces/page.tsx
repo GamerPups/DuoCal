@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Plus, Mail, Users, CalendarDays } from "lucide-react";
 import Link from "next/link";
@@ -13,13 +13,18 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { GuestBanner } from "@/components/auth/GuestBanner";
+import { SignInButton } from "@/components/auth/SignInButton";
 import { JoinCodeDisplay } from "@/components/workspace/JoinCodeDisplay";
 import { ColorPicker } from "@/components/workspace/ColorPicker";
 import { useToast } from "@/components/ui/toast";
+import { useRequireAuth } from "@/hooks/use-require-auth";
+import { fetchJsonArray } from "@/lib/api-client";
 import type { WorkspaceDTO } from "@/types";
 
 export default function WorkspacesPage() {
   const { toast } = useToast();
+  const { isAuthenticated, requireAuth } = useRequireAuth();
   const [workspaces, setWorkspaces] = useState<WorkspaceDTO[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
@@ -34,6 +39,8 @@ export default function WorkspacesPage() {
   const [loading, setLoading] = useState(false);
 
   const lookupJoinCode = async (code: string) => {
+    if (!isAuthenticated) return;
+
     const normalized = code.replace(/-/g, "");
     if (normalized.length !== 8) {
       setClaimedColors([]);
@@ -46,16 +53,30 @@ export default function WorkspacesPage() {
     }
   };
 
-  const fetchWorkspaces = async () => {
-    const res = await fetch("/api/calendars");
-    if (res.ok) setWorkspaces(await res.json());
-  };
+  const fetchWorkspaces = useCallback(async () => {
+    if (!isAuthenticated) {
+      setWorkspaces([]);
+      return;
+    }
+    setWorkspaces(await fetchJsonArray<WorkspaceDTO>("/api/calendars"));
+  }, [isAuthenticated]);
 
   useEffect(() => {
     fetchWorkspaces();
-  }, []);
+  }, [fetchWorkspaces]);
+
+  const openCreate = () => {
+    if (!requireAuth("/workspaces")) return;
+    setCreateOpen(true);
+  };
+
+  const openJoin = () => {
+    if (!requireAuth("/workspaces")) return;
+    setJoinOpen(true);
+  };
 
   const handleCreate = async () => {
+    if (!requireAuth("/workspaces")) return;
     if (!newName.trim()) return;
     setLoading(true);
     try {
@@ -69,6 +90,8 @@ export default function WorkspacesPage() {
         setNewName("");
         fetchWorkspaces();
         toast("Workspace created");
+      } else if (res.status === 401) {
+        requireAuth("/workspaces");
       }
     } finally {
       setLoading(false);
@@ -76,6 +99,7 @@ export default function WorkspacesPage() {
   };
 
   const handleJoin = async (skipColor = false) => {
+    if (!requireAuth("/workspaces")) return;
     setLoading(true);
     try {
       const res = await fetch("/api/calendars/join", {
@@ -94,7 +118,11 @@ export default function WorkspacesPage() {
         toast("Joined workspace");
       } else {
         const data = await res.json();
-        toast(data.error ?? "Failed to join", "error");
+        if (res.status === 401) {
+          requireAuth("/workspaces");
+        } else {
+          toast(data.error ?? "Failed to join", "error");
+        }
       }
     } finally {
       setLoading(false);
@@ -102,6 +130,7 @@ export default function WorkspacesPage() {
   };
 
   const handleInvite = async () => {
+    if (!requireAuth("/workspaces")) return;
     if (!selectedWorkspace || !inviteEmail.trim()) return;
     setLoading(true);
     try {
@@ -119,7 +148,11 @@ export default function WorkspacesPage() {
         toast("Invite sent!");
       } else {
         const data = await res.json();
-        toast(data.error ?? "Failed to send invite", "error");
+        if (res.status === 401) {
+          requireAuth("/workspaces");
+        } else {
+          toast(data.error ?? "Failed to send invite", "error");
+        }
       }
     } finally {
       setLoading(false);
@@ -128,6 +161,8 @@ export default function WorkspacesPage() {
 
   return (
     <div className="space-y-6">
+      {!isAuthenticated && <GuestBanner />}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Workspaces</h1>
@@ -136,10 +171,10 @@ export default function WorkspacesPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setJoinOpen(true)}>
+          <Button variant="outline" onClick={openJoin}>
             Join Workspace
           </Button>
-          <Button onClick={() => setCreateOpen(true)} className="gap-2">
+          <Button onClick={openCreate} className="gap-2">
             <Plus className="h-4 w-4" />
             Create
           </Button>
@@ -184,12 +219,7 @@ export default function WorkspacesPage() {
             </div>
 
             <div className="mt-4 flex gap-2">
-              <Button
-                variant="default"
-                size="sm"
-                className="flex-1 gap-2"
-                asChild
-              >
+              <Button variant="default" size="sm" className="flex-1 gap-2" asChild>
                 <Link href={`/calendar?workspace=${ws.id}`}>
                   <CalendarDays className="h-3.5 w-3.5" />
                   Open Calendar
@@ -200,6 +230,7 @@ export default function WorkspacesPage() {
                 size="sm"
                 className="flex-1 gap-2"
                 onClick={() => {
+                  if (!requireAuth("/workspaces")) return;
                   setSelectedWorkspace(ws);
                   setInviteOpen(true);
                 }}
@@ -215,8 +246,19 @@ export default function WorkspacesPage() {
       {workspaces.length === 0 && (
         <div className="rounded-xl border border-dashed border-duocal-border py-16 text-center">
           <Users className="mx-auto h-10 w-10 text-slate-600" />
-          <p className="mt-3 text-slate-400">No workspaces yet</p>
-          <p className="text-sm text-slate-600">Create one or join with an invite code</p>
+          <p className="mt-3 text-slate-400">
+            {isAuthenticated ? "No workspaces yet" : "Sign in to create or join workspaces"}
+          </p>
+          <p className="text-sm text-slate-600">
+            {isAuthenticated
+              ? "Create one or join with an invite code"
+              : "Browse freely — your workspaces appear after sign-in"}
+          </p>
+          {!isAuthenticated && (
+            <div className="mt-6 flex justify-center">
+              <SignInButton callbackUrl="/workspaces" />
+            </div>
+          )}
         </div>
       )}
 

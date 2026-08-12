@@ -34,7 +34,17 @@ Edit `.env`:
      ```
 5. Copy Client ID and Client Secret into `.env`
 
-## 3. Database & run
+## 3. Database (required)
+
+**Vercel cannot use SQLite.** You need a free PostgreSQL database:
+
+1. Go to **[neon.tech](https://neon.tech)** → sign up free
+2. Create a project called `duocal`
+3. Copy the **connection string**
+4. Add to Vercel as `DATABASE_URL`
+5. Run once locally: `npx prisma db push`
+
+## 4. Database & run
 
 ```bash
 npx prisma db push

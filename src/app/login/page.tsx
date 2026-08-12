@@ -1,11 +1,34 @@
 "use client";
 
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { AlertCircle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function LoginPage() {
+function LoginContent() {
+  const searchParams = useSearchParams();
+  const error = searchParams.get("error");
+  const [configError, setConfigError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) setConfigError(data.message ?? "Server configuration error");
+      })
+      .catch(() => setConfigError("Cannot reach server. Is the dev server running?"));
+  }, []);
+
+  const errorMessage =
+    configError ??
+    (error === "Configuration"
+      ? "Auth is misconfigured. Check NEXTAUTH_SECRET, NEXTAUTH_URL, and Google OAuth credentials."
+      : error
+        ? "Sign-in failed. Please try again."
+        : null);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-duocal-void p-4">
       <div className="absolute inset-0 bg-grid-pattern bg-[length:40px_40px] opacity-30" />
@@ -30,11 +53,19 @@ export default function LoginPage() {
             Privacy-first shared calendars with AI scheduling
           </p>
 
+          {errorMessage && (
+            <div className="mt-6 flex gap-3 rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>{errorMessage}</p>
+            </div>
+          )}
+
           <div className="mt-8 space-y-3">
             <Button
               onClick={() => signIn("google", { callbackUrl: "/calendar" })}
               className="w-full gap-3"
               size="lg"
+              disabled={!!configError}
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
                 <path
@@ -64,5 +95,13 @@ export default function LoginPage() {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   );
 }

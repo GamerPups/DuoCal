@@ -10,7 +10,6 @@ function buildAuthOptions(): NextAuthOptions {
 
   return {
     adapter: PrismaAdapter(prisma),
-    trustHost: true,
     providers: [
       GoogleProvider({
         clientId: googleClientId,
